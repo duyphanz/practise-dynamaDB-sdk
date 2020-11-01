@@ -1,5 +1,6 @@
 const AWS = require("aws-sdk");
 const { MtoMItems } = require("./seeding");
+const { handleCallback } = require("./utils");
 
 AWS.config.update({
   region: "us-east-1",
@@ -61,17 +62,14 @@ const createTable = () => {
       },
     ],
   };
-  dynamodb.createTable(params, function (err, data) {
-    if (err) console.log(err);
-    else console.log(data);
-  });
+  dynamodb.createTable(params, handleCallback);
 };
 
 const putItem = (Item) => {
   var params = {
     TableName,
     Item,
-    ConditionExpression: "attribute_not_exists(PK)", // optional String describing the constraint to be placed on an attribute
+    ConditionExpression: "attribute_not_exists(PK)",
   };
   dynamodb.putItem(params, function (err, data) {
     if (err) console.log(err);
@@ -84,18 +82,14 @@ const getItem = (Key) => {
     TableName,
     Key,
   };
-  dynamodb.getItem(params, function (err, data) {
-    if (err) console.log(err);
-    else console.log(data);
-  });
+  dynamodb.getItem(params, handleCallback);
 };
 
 const queryClassesOfAStudent = ({ IndexName, PK, SK }) => {
   var params = {
     TableName,
     IndexName,
-    KeyConditionExpression: "#SK = :SK and begins_with(#PK, :PK)", // a string representing a constraint on the attribute
-    // KeyConditionExpression: "#PK = :PK and begins_with(#SK, :SK)", // a string representing a constraint on the attribute
+    KeyConditionExpression: "#SK = :SK and begins_with(#PK, :PK)",
     ExpressionAttributeNames: {
       "#PK": "PK",
       "#SK": "SK",
@@ -105,16 +99,13 @@ const queryClassesOfAStudent = ({ IndexName, PK, SK }) => {
       ":SK": { S: SK },
     },
   };
-  dynamodb.query(params, function (err, data) {
-    if (err) console.log(err);
-    else console.log(JSON.stringify(data, null, 2));
-  });
+  dynamodb.query(params, handleCallback);
 };
 
 const queryStudentsOfAClass = ({ PK, SK }) => {
   var params = {
     TableName,
-    KeyConditionExpression: "#PK = :PK and begins_with(#SK, :SK)", // a string representing a constraint on the attribute
+    KeyConditionExpression: "#PK = :PK and begins_with(#SK, :SK)",
     ExpressionAttributeNames: {
       "#PK": "PK",
       "#SK": "SK",
@@ -124,10 +115,7 @@ const queryStudentsOfAClass = ({ PK, SK }) => {
       ":SK": { S: SK },
     },
   };
-  dynamodb.query(params, function (err, data) {
-    if (err) console.log(err);
-    else console.log(JSON.stringify(data, null, 2));
-  });
+  dynamodb.query(params, handleCallback);
 };
 
 // CALLING FUNCTIONS
