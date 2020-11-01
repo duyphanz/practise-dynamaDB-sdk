@@ -1,4 +1,5 @@
 const AWS = require("aws-sdk");
+const { MtoMItems } = require("./seeding");
 
 AWS.config.update({
   region: "us-east-1",
@@ -14,20 +15,16 @@ const createTable = () => {
   var params = {
     TableName,
     KeySchema: [
-      // The type of of schema.  Must start with a HASH type, with an optional second RANGE.
       {
-        // Required HASH type attribute
         AttributeName: "PK",
         KeyType: "HASH",
       },
       {
-        // Optional RANGE key type for HASH + RANGE tables
         AttributeName: "SK",
         KeyType: "RANGE",
       },
     ],
     AttributeDefinitions: [
-      // The names and types of all primary and index key attributes only
       {
         AttributeName: "PK",
         AttributeType: "S", // (S | N | B) for string, number, binary
@@ -41,47 +38,34 @@ const createTable = () => {
       ReadCapacityUnits: 1,
       WriteCapacityUnits: 1,
     },
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "GS1",
+        KeySchema: [
+          {
+            AttributeName: "SK",
+            KeyType: "HASH",
+          },
+          {
+            AttributeName: "PK",
+            KeyType: "RANGE",
+          },
+        ],
+        Projection: {
+          ProjectionType: "ALL", // (ALL | KEYS_ONLY | INCLUDE)
+        },
+        ProvisionedThroughput: {
+          ReadCapacityUnits: 1,
+          WriteCapacityUnits: 1,
+        },
+      },
+    ],
   };
   dynamodb.createTable(params, function (err, data) {
     if (err) console.log(err);
     else console.log(data);
   });
 };
-
-const items = [
-  {
-    PK: { S: "STUDENT#alex" },
-    SK: { S: "STUDENT#alex" },
-    StudentName: { S: "Alex DeBrie" },
-    GPA: { N: "3.12" },
-    GraduationDate: { S: "2021-05-26" },
-  },
-  {
-    PK: { S: "STUDENT#alber" },
-    SK: { S: "STUDENT#alber" },
-    StudentName: { S: "Albert Einstein" },
-    GPA: { N: "4.0" },
-    GraduationDate: { S: "2020-05-14" },
-  },
-  {
-    PK: { S: "STUDENT#dracomalfoy" },
-    SK: { S: "STUDENT#dracomalfoy" },
-    StudentName: { S: "Draco Malfoy" },
-    GPA: { S: "1.87" },
-  },
-  {
-    PK: { S: "CLASS#Physics101" },
-    SK: { S: "SEMESTER#Spring2020" },
-    ClassName: { S: "Physics 101" },
-    Students: { L: [{ S: "Alex DeBrie" }, { S: "Albert Einstein" }] },
-  },
-  {
-    PK: { S: "CLASS#Gym202" },
-    SK: { S: "SEMESTER#Spring2020" },
-    ClassName: { S: "Gym 202" },
-    Students: { L: [{ S: "Draco Malfoy" }, { S: "Alex DeBrie" }] },
-  },
-];
 
 const putItem = (Item) => {
   var params = {
@@ -106,9 +90,51 @@ const getItem = (Key) => {
   });
 };
 
+const queryClassesOfAStudent = ({ IndexName, PK, SK }) => {
+  var params = {
+    TableName,
+    IndexName,
+    KeyConditionExpression: "#SK = :SK and begins_with(#PK, :PK)", // a string representing a constraint on the attribute
+    // KeyConditionExpression: "#PK = :PK and begins_with(#SK, :SK)", // a string representing a constraint on the attribute
+    ExpressionAttributeNames: {
+      "#PK": "PK",
+      "#SK": "SK",
+    },
+    ExpressionAttributeValues: {
+      ":PK": { S: PK },
+      ":SK": { S: SK },
+    },
+  };
+  dynamodb.query(params, function (err, data) {
+    if (err) console.log(err);
+    else console.log(JSON.stringify(data, null, 2));
+  });
+};
+
+const queryStudentsOfAClass = ({ PK, SK }) => {
+  var params = {
+    TableName,
+    KeyConditionExpression: "#PK = :PK and begins_with(#SK, :SK)", // a string representing a constraint on the attribute
+    ExpressionAttributeNames: {
+      "#PK": "PK",
+      "#SK": "SK",
+    },
+    ExpressionAttributeValues: {
+      ":PK": { S: PK },
+      ":SK": { S: SK },
+    },
+  };
+  dynamodb.query(params, function (err, data) {
+    if (err) console.log(err);
+    else console.log(JSON.stringify(data, null, 2));
+  });
+};
+
 // CALLING FUNCTIONS
 
 // createTable();
-// items.forEach((i) => putItem(i));
-getItem({ PK: { S: "STUDENT#alex" }, SK: { S: "STUDENT#alex" } });
-getItem({ PK: { S: "CLASS#Physics101" }, SK: { S: "SEMESTER#Spring2020" } });
+// MtoMItems.forEach((i) => putItem(i));
+// getItem({ PK: { S: "STUDENT#alex" }, SK: { S: "STUDENT#alex" } });
+// getItem({ PK: { S: "CLASS#Physics101" }, SK: { S: "CLASS#Physics101" } });
+// queryStudentsOfAClass({ PK: "CLASS#Physics101", SK: "STUDENT" });
+// queryClassesOfAStudent({ PK: "CLASS", SK: "STUDENT#alex", IndexName: "GS1" });
